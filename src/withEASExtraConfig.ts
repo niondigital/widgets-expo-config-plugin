@@ -7,13 +7,15 @@ import { WidgetsPluginProps } from './types/types';
  * for EAS CLI to know what app extensions exist before the build starts (before the Xcode project has been generated)
  * to ensure that the required credentials are generated and validated.
  *
- * @param config
- * @param props
+ * @param config - The Expo config
+ * @param props - Widget plugin properties
+ * @returns Updated Expo config with EAS app extension configuration
  */
 export const withEASExtraConfig: ConfigPlugin<WidgetsPluginProps> = (config, props) => {
 	const targetName = props.name;
 	const widgetBundleId = `${config.ios?.bundleIdentifier}.${targetName}`;
 
+  	// Define the new app extension configuration
 	const newAppExtensions = [
 		{
 			targetName,
@@ -24,6 +26,7 @@ export const withEASExtraConfig: ConfigPlugin<WidgetsPluginProps> = (config, pro
 		}
 	];
 
+  	// Update the config with the new extension, preserving existing configuration
 	config.extra = {
 		...config.extra,
 		eas: {

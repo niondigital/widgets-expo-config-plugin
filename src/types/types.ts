@@ -3,4 +3,5 @@ export type WidgetsPluginProps = {
 	files: string[];
 	name?: string;
 	buildSettings?: Record<string, string>;
+	appGroup?: string;
 };
