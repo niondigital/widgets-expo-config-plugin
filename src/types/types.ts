@@ -1,7 +1,8 @@
 export type WidgetsPluginProps = {
-	path: string;
-	files: string[];
-	name?: string;
-	buildSettings?: Record<string, string>;
 	appGroup?: string;
+	buildSettings?: Record<string, string>;
+	files: string[];
+	folders?: string[]
+	name: string;
+	path: string;
 };

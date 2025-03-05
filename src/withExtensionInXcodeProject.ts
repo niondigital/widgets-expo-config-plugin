@@ -1,7 +1,11 @@
 import { ConfigPlugin, withXcodeProject } from '@expo/config-plugins';
-
+import * as fs from 'fs';
+import * as path from 'path';
 import { WidgetsPluginProps } from './types/types';
 
+/**
+ * Default build configuration settings for widget extensions
+ */
 const BASE_BUILD_CONFIGURATION_SETTINGS = {
 	ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: 'AccentColor',
 	ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME: 'WidgetBackground',
@@ -32,30 +36,78 @@ const BASE_BUILD_CONFIGURATION_SETTINGS = {
 };
 
 /**
+ * Recursively collects all files from a directory and its subdirectories
+ * 
+ * @param dirPath - Path to the directory
+ * @param basePath - Base path for creating relative paths
+ * @returns Array of file paths relative to basePath
+ */
+function collectFilesFromFolder(folder: string, folderPath: string): string[] {
+	const folderPath = path.join(extensionPath, folder);
+	// create absolute path to check if folders exist
+	const absoluteFolderPath = `${__dirname}/../../../${folderPath}`;
+
+	if (!fs.existsSync(absoluteFolderPath)) {
+		return [];
+	}
+
+	let files: string[] = [];
+	const entries = fs.readdirSync(absoluteFolderPath, { withFileTypes: true });
+
+	for (const entry of entries) {
+		const subFolderPath = `${folder}/${entry.name}`;
+		if (entry.isDirectory()) {
+			// Recursively collect files from subdirectories
+			files = [...files, ...collectFilesFromFolder(subFolderPath, folderPath)];
+		} else {
+			files.push(subFolderPath);
+		}
+	}
+
+	return files;
+}
+
+/**
  * Adds a widget extension target to the Xcode project.
+ * Supports both individual files and folders.
  *
- * @param config
- * @param props
+ * @param config - The Expo config
+ * @param props - Widget plugin properties
+ * @returns Updated Expo config with widget extension target
  */
 export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (config, props) => {
 	return withXcodeProject(config, (newConfig) => {
 		const xcodeProject = newConfig.modResults;
-
 		const targetName = props.name;
-		const files = props.files || [];
-		const { path } = props;
+		const { path: widgetPath } = props;
 		const widgetBundleId = `${config.ios?.bundleIdentifier}.${targetName}`;
-
+		
+		// Skip if target already exists
 		if (xcodeProject.pbxTargetByName(targetName)) {
 			console.log(`${targetName} already exists in project. Skipping...`);
 			return newConfig;
 		}
 
+		// Process files and folders
+		let allFiles: string[] = [];
+		
+		// Add explicitly specified files
+		if (props.files && props.files.length > 0) {
+			allFiles = [...props.files];
+		}
+		
+		// Add files from folders if specified
+		if (props.folders && props.folders.length > 0) {
+			for (const folder of props.folders) {
+				const folderFiles = collectFilesFromFolder(folder, widgetPath);
+				allFiles = [...allFiles, ...folderFiles];
+			}
+		}
+		
 		// Create new PBXGroup for the extension
-		const extGroup = xcodeProject.addPbxGroup(files, targetName, path);
+		const extGroup = xcodeProject.addPbxGroup(allFiles, targetName, widgetPath);
 
-		// Add the new PBXGroup to the top level group. This makes the
-		// files / folder appear in the file explorer in Xcode.
+		// Add the new PBXGroup to the top level group
 		const groups: any[] = xcodeProject.hash.project.objects['PBXGroup'];
 		Object.entries(groups).forEach(([key, group]) => {
 			if (typeof group === 'object' && group.name === undefined && group.path === undefined) {
@@ -63,31 +115,40 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 			}
 		});
 
-		// WORK AROUND for codeProject.addTarget BUG
-		// Xcode projects don't contain these if there is only one target
-		// An upstream fix should be made to the code referenced in this link:
-		//   - https://github.com/apache/cordova-node-xcode/blob/8b98cabc5978359db88dc9ff2d4c015cba40f150/lib/pbxProject.js#L860
+		// WORK AROUND for xcodeProject.addTarget BUG
+		// Initialize objects that might be missing in projects with only one target
 		const projObjects = xcodeProject.hash.project.objects;
 		projObjects['PBXTargetDependency'] = projObjects['PBXTargetDependency'] || {};
-		projObjects['PBXContainerItemProxy'] = projObjects['PBXTargetDependency'] || {};
+		projObjects['PBXContainerItemProxy'] = projObjects['PBXContainerItemProxy'] || {};
 
 		// Add the target
-		// This adds PBXTargetDependency and PBXContainerItemProxy for you
 		const newTarget = xcodeProject.addTarget(targetName, 'app_extension', targetName, widgetBundleId);
 
+		// Filter files by type for different build phases
+		const sourceFiles = allFiles.filter(file => file.endsWith('.swift'));
+		const resourceFiles = allFiles.filter(file => 
+			file.endsWith('.xcassets') || 
+			file.endsWith('.storyboard') || 
+			file.endsWith('.xib') ||
+			file.endsWith('.strings') ||
+			file.endsWith('.json')
+		);
+		
 		// Add build phases to the new target
 		xcodeProject.addBuildPhase(
-			files.filter((file) => file.endsWith('.swift')),
+			sourceFiles,
 			'PBXSourcesBuildPhase',
 			'Sources',
 			newTarget.uuid
 		);
+		
 		xcodeProject.addBuildPhase(
-			files.filter((file) => file.endsWith('.xcassets')),
+			resourceFiles,
 			'PBXResourcesBuildPhase',
 			'Resources',
 			newTarget.uuid
 		);
+		
 		xcodeProject.addBuildPhase(
 			['SwiftUI.framework', 'WidgetKit.framework'],
 			'PBXFrameworksBuildPhase',
@@ -95,15 +156,16 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 			newTarget.uuid
 		);
 
-		// Set the most essential (and necessary) build settings of the new target
+		// Configure build settings
 		const configurations: { buildSettings: Record<string, string | number> | undefined }[] =
 			xcodeProject.pbxXCBuildConfigurationSection();
+			
 		Object.values(configurations).forEach((configuration) => {
 			if (configuration.buildSettings?.PRODUCT_NAME === `"${targetName}"`) {
 				configuration.buildSettings = {
 					...configuration.buildSettings,
 					...BASE_BUILD_CONFIGURATION_SETTINGS,
-					INFOPLIST_FILE: `${path}/Info.plist`,
+					INFOPLIST_FILE: `${widgetPath}/Info.plist`,
 					MARKETING_VERSION: config.version ?? '1.0.0',
 					CURRENT_PROJECT_VERSION: config.ios?.buildNumber ?? 1,
 					PRODUCT_BUNDLE_IDENTIFIER: widgetBundleId,
