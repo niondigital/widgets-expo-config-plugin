@@ -39,7 +39,9 @@ Modify your `app.json` / `app.config.js` / `app.config.ts` to include the plugin
     [
       "@niondigital/widgets-expo-config-plugin",
       {
+        "appGroup": "SharedData",
         "path": "widgets/ios/ExampleWidget",
+        "folders": ["intents", "widgets"], // all files within folders are added!
         "files": [
           "Info.plist",
           "Assets.xcassets",
