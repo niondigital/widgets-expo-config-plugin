@@ -42,9 +42,9 @@ const BASE_BUILD_CONFIGURATION_SETTINGS = {
  * @param basePath - Base path for creating relative paths
  * @returns Array of file paths relative to basePath
  */
-function collectFilesFromFolder(folder: string, folderPath: string): string[] {
+function collectFilesFromFolder(folder: string, extensionPath: string): string[] {
 	const folderPath = path.join(extensionPath, folder);
-	// create absolute path to check if folders exist
+	// create absolute path to check if folders exist and read it's content
 	const absoluteFolderPath = `${__dirname}/../../../${folderPath}`;
 
 	if (!fs.existsSync(absoluteFolderPath)) {
@@ -79,7 +79,7 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 	return withXcodeProject(config, (newConfig) => {
 		const xcodeProject = newConfig.modResults;
 		const targetName = props.name;
-		const { path: widgetPath } = props;
+		const { path: extensionPath } = props;
 		const widgetBundleId = `${config.ios?.bundleIdentifier}.${targetName}`;
 		
 		// Skip if target already exists
@@ -99,13 +99,13 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 		// Add files from folders if specified
 		if (props.folders && props.folders.length > 0) {
 			for (const folder of props.folders) {
-				const folderFiles = collectFilesFromFolder(folder, widgetPath);
+				const folderFiles = collectFilesFromFolder(folder, extensionPath);
 				allFiles = [...allFiles, ...folderFiles];
 			}
 		}
 		
 		// Create new PBXGroup for the extension
-		const extGroup = xcodeProject.addPbxGroup(allFiles, targetName, widgetPath);
+		const extGroup = xcodeProject.addPbxGroup(allFiles, targetName, extensionPath);
 
 		// Add the new PBXGroup to the top level group
 		const groups: any[] = xcodeProject.hash.project.objects['PBXGroup'];
@@ -165,7 +165,7 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 				configuration.buildSettings = {
 					...configuration.buildSettings,
 					...BASE_BUILD_CONFIGURATION_SETTINGS,
-					INFOPLIST_FILE: `${widgetPath}/Info.plist`,
+					INFOPLIST_FILE: `${extensionPath}/Info.plist`,
 					MARKETING_VERSION: config.version ?? '1.0.0',
 					CURRENT_PROJECT_VERSION: config.ios?.buildNumber ?? 1,
 					PRODUCT_BUNDLE_IDENTIFIER: widgetBundleId,
