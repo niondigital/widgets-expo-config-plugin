@@ -8,25 +8,29 @@ import { WidgetsPluginProps } from './types/types';
  * @param props - Widget plugin properties containing the app group name
  * @returns Updated Expo config with app group entitlement
  */
-export const withAppGroup: ConfigPlugin<WidgetsPluginProps> = (config, props) => {
-	const APP_GROUP_KEY = 'com.apple.security.application-groups';
+export const withAppGroup: ConfigPlugin<WidgetsPluginProps> = (expoConfig, props) => {
+	return withEntitlementsPlist(expoConfig, (config) => {
+		const entitlements = config.modResults;
 
-	return withEntitlementsPlist(config, (newConfig) => {
-		// Initialize the app groups array if it doesn't exist
-		if (!Array.isArray(newConfig.modResults[APP_GROUP_KEY])) {
-			newConfig.modResults[APP_GROUP_KEY] = [];
-		}
+		config.modResults = props?.entitlements ?? {}
 
-		const appGroupsArray = newConfig.modResults[APP_GROUP_KEY];
-		const bundleId = newConfig?.ios?.bundleIdentifier || '';
-		const appGroupName = props?.appGroup || '';
-		const entitlement = `group.${bundleId}.${appGroupName}`;
+		return config;
 
-		// Only add the entitlement if it doesn't already exist
-		if (!appGroupsArray.includes(entitlement)) {
-			appGroupsArray.push(entitlement);
-		}
+		// // Initialize the app groups array if it doesn't exist
+		// if (!Array.isArray(newConfig.modResults[APP_GROUP_KEY])) {
+		// 	newConfig.modResults[APP_GROUP_KEY] = [];
+		// }
 
-		return newConfig;
+		// const appGroupsArray = newConfig.modResults[APP_GROUP_KEY];
+		// const bundleId = newConfig?.ios?.bundleIdentifier || '';
+		// const appGroupName = props?.appGroup || '';
+		// const entitlement = `group.${bundleId}.${appGroupName}`;
+
+		// // Only add the entitlement if it doesn't already exist
+		// if (!appGroupsArray.includes(entitlement)) {
+		// 	appGroupsArray.push(entitlement);
+		// }
+
+		// return newConfig;
 	});
 };

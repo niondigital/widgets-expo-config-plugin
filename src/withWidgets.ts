@@ -24,9 +24,8 @@ const withWidgets: ConfigPlugin<WidgetsPluginProps> = (config, props) => {
 	
 	// Apply configuration changes in sequence
 	return [
-		withExtensionInXcodeProject,
 		withEASExtraConfig,
-		withAppGroup
+		withExtensionInXcodeProject,
 	].reduce((updatedConfig, plugin) => {
 		return plugin(updatedConfig, enhancedProps);
 	}, config);

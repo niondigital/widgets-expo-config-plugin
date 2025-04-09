@@ -1,5 +1,5 @@
 export type WidgetsPluginProps = {
-	appGroup?: string;
+	entitlements?: Record<string, any>;
 	buildSettings?: Record<string, string>;
 	files: string[];
 	folders?: string[]
