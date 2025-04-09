@@ -21,7 +21,9 @@ export const withEASExtraConfig: ConfigPlugin<WidgetsPluginProps> = (config, pro
 			targetName,
 			bundleIdentifier: widgetBundleId,
 			entitlements: {
-				'com.apple.security.application-groups': [`group.${config?.ios?.bundleIdentifier}.${props.appGroup || props.name}`]
+				'com.apple.security.application-groups': [`group.${config?.ios?.bundleIdentifier}.${props.appGroup || props.name}`],
+				'keychain-access-groups': [`group.${config?.ios?.bundleIdentifier}.SharedKeychain`],
+				'com.apple.security.shared-credentials': true
 			}
 		}
 	];
