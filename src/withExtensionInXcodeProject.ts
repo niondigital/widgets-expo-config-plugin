@@ -37,7 +37,7 @@ const BASE_BUILD_CONFIGURATION_SETTINGS = {
 
 /**
  * Recursively collects all files from a directory and its subdirectories
- * 
+ *
  * @param dirPath - Path to the directory
  * @param basePath - Base path for creating relative paths
  * @returns Array of file paths relative to basePath
@@ -81,7 +81,7 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 		const targetName = props.name;
 		const { path: extensionPath } = props;
 		const widgetBundleId = `${config.ios?.bundleIdentifier}.${targetName}`;
-		
+
 		// Skip if target already exists
 		if (xcodeProject.pbxTargetByName(targetName)) {
 			console.log(`${targetName} already exists in project. Skipping...`);
@@ -90,12 +90,12 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 
 		// Process files and folders
 		let allFiles: string[] = [];
-		
+
 		// Add explicitly specified files
 		if (props.files && props.files.length > 0) {
 			allFiles = [...props.files];
 		}
-		
+
 		// Add files from folders if specified
 		if (props.folders && props.folders.length > 0) {
 			for (const folder of props.folders) {
@@ -103,7 +103,7 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 				allFiles = [...allFiles, ...folderFiles];
 			}
 		}
-		
+
 		// Create new PBXGroup for the extension
 		const extGroup = xcodeProject.addPbxGroup(allFiles, targetName, extensionPath);
 
@@ -126,14 +126,14 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 
 		// Filter files by type for different build phases
 		const sourceFiles = allFiles.filter(file => file.endsWith('.swift'));
-		const resourceFiles = allFiles.filter(file => 
-			file.endsWith('.xcassets') || 
-			file.endsWith('.storyboard') || 
+		const resourceFiles = allFiles.filter(file =>
+			file.endsWith('.xcassets') ||
+			file.endsWith('.storyboard') ||
 			file.endsWith('.xib') ||
 			file.endsWith('.strings') ||
 			file.endsWith('.json')
 		);
-		
+
 		// Add build phases to the new target
 		xcodeProject.addBuildPhase(
 			sourceFiles,
@@ -141,14 +141,14 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 			'Sources',
 			newTarget.uuid
 		);
-		
+
 		xcodeProject.addBuildPhase(
 			resourceFiles,
 			'PBXResourcesBuildPhase',
 			'Resources',
 			newTarget.uuid
 		);
-		
+
 		xcodeProject.addBuildPhase(
 			['SwiftUI.framework', 'WidgetKit.framework'],
 			'PBXFrameworksBuildPhase',
@@ -159,7 +159,7 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 		// Configure build settings
 		const configurations: { buildSettings: Record<string, string | number> | undefined }[] =
 			xcodeProject.pbxXCBuildConfigurationSection();
-			
+
 		Object.values(configurations).forEach((configuration) => {
 			if (configuration.buildSettings?.PRODUCT_NAME === `"${targetName}"`) {
 				configuration.buildSettings = {
@@ -169,7 +169,6 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 					MARKETING_VERSION: config.version ?? '1.0.0',
 					CURRENT_PROJECT_VERSION: config.ios?.buildNumber ?? 1,
 					PRODUCT_BUNDLE_IDENTIFIER: widgetBundleId,
-					CODE_SIGN_ENTITLEMENTS: `${extensionPath}/RXConnectWidget.entitlements`,
 					...props.buildSettings
 				};
 			}
