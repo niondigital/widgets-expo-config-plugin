@@ -1,6 +1,7 @@
 import { ConfigPlugin, withXcodeProject } from '@expo/config-plugins';
 import * as fs from 'fs';
 import * as path from 'path';
+
 import { WidgetsPluginProps } from './types/types';
 
 /**
@@ -42,34 +43,39 @@ const BASE_BUILD_CONFIGURATION_SETTINGS = {
  * @param basePath - Base path for creating relative paths
  * @returns Array of file paths relative to basePath
  */
-function collectFilesFromFolder(folder: string, extensionPath: string): string[] {
-	const folderPath = path.join(extensionPath, folder);
-	// create absolute path to check if folders exist and read it's content
-	const absoluteFolderPath = `${__dirname}/../../../${folderPath}`;
+function collectFilesFromFolder(folder: string): string[] {
+	console.log('y', folder);
 
-	if (!fs.existsSync(absoluteFolderPath)) {
+	console.log('folder', folder);
+	if (!fs.existsSync(folder)) {
+		console.log('not exist');
+		// TODO error
 		return [];
 	}
 
 	let files: string[] = [];
-	const entries = fs.readdirSync(absoluteFolderPath, { withFileTypes: true });
+	const entries = fs.readdirSync(folder, { withFileTypes: true });
 
-	for (const entry of entries) {
-		const subFolderPath = `${folder}/${entry.name}`;
-		if (entry.isDirectory()) {
+	entries.forEach((entry) => {
+		const subFolderPath = path.join(folder, entry.name);
+
+		if (entry.name.endsWith('.entitlements')) {
+			return;
+		}
+
+		if (entry.isDirectory() && !entry.name.endsWith('.xcassets')) {
 			// Recursively collect files from subdirectories
-			files = [...files, ...collectFilesFromFolder(subFolderPath, folderPath)];
+			files = [...files, ...collectFilesFromFolder(subFolderPath)];
 		} else {
 			files.push(subFolderPath);
 		}
-	}
+	});
 
 	return files;
 }
 
 /**
  * Adds a widget extension target to the Xcode project.
- * Supports both individual files and folders.
  *
  * @param config - The Expo config
  * @param props - Widget plugin properties
@@ -78,6 +84,7 @@ function collectFilesFromFolder(folder: string, extensionPath: string): string[]
 export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (config, props) => {
 	return withXcodeProject(config, (newConfig) => {
 		const xcodeProject = newConfig.modResults;
+
 		const targetName = props.name;
 		const { path: extensionPath } = props;
 		const widgetBundleId = `${config.ios?.bundleIdentifier}.${targetName}`;
@@ -88,24 +95,13 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 			return newConfig;
 		}
 
-		// Process files and folders
-		let allFiles: string[] = [];
-
-		// Add explicitly specified files
-		if (props.files && props.files.length > 0) {
-			allFiles = [...props.files];
-		}
-
-		// Add files from folders if specified
-		if (props.folders && props.folders.length > 0) {
-			for (const folder of props.folders) {
-				const folderFiles = collectFilesFromFolder(folder, extensionPath);
-				allFiles = [...allFiles, ...folderFiles];
-			}
-		}
+		const absoluteExtensionPath = path.join(newConfig.modRequest.projectRoot, extensionPath);
+		const allFilesInPath: string[] = collectFilesFromFolder(
+			absoluteExtensionPath
+		);
 
 		// Create new PBXGroup for the extension
-		const extGroup = xcodeProject.addPbxGroup(allFiles, targetName, extensionPath);
+		const extGroup = xcodeProject.addPbxGroup(allFilesInPath, targetName, absoluteExtensionPath.replace('/Users/swe/Workspace/rx-connect-app', '..')); // TODO here wohl relativ
 
 		// Add the new PBXGroup to the top level group
 		const groups: any[] = xcodeProject.hash.project.objects['PBXGroup'];
@@ -115,8 +111,10 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 			}
 		});
 
-		// WORK AROUND for xcodeProject.addTarget BUG
-		// Initialize objects that might be missing in projects with only one target
+		/// WORK AROUND for codeProject.addTarget BUG
+		// Xcode projects don't contain these if there is only one target
+		// An upstream fix should be made to the code referenced in this link:
+		//   - https://github.com/apache/cordova-node-xcode/blob/8b98cabc5978359db88dc9ff2d4c015cba40f150/lib/pbxProject.js#L860
 		const projObjects = xcodeProject.hash.project.objects;
 		projObjects['PBXTargetDependency'] = projObjects['PBXTargetDependency'] || {};
 		projObjects['PBXContainerItemProxy'] = projObjects['PBXContainerItemProxy'] || {};
@@ -124,30 +122,25 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 		// Add the target
 		const newTarget = xcodeProject.addTarget(targetName, 'app_extension', targetName, widgetBundleId);
 
+		console.log('allFiles', allFilesInPath);
+
 		// Filter files by type for different build phases
-		const sourceFiles = allFiles.filter(file => file.endsWith('.swift'));
-		const resourceFiles = allFiles.filter(file =>
-			file.endsWith('.xcassets') ||
-			file.endsWith('.storyboard') ||
-			file.endsWith('.xib') ||
-			file.endsWith('.strings') ||
-			file.endsWith('.json')
+		const sourceFiles = allFilesInPath.filter((file) => file.endsWith('.swift'));
+		const resourceFiles = allFilesInPath.filter(
+			(file) =>
+				file.endsWith('.xcassets') ||
+				file.endsWith('.storyboard') ||
+				file.endsWith('.xib') ||
+				file.endsWith('.strings') ||
+				file.endsWith('.json')
 		);
+
+		console.log('sourceFiles', sourceFiles);
 
 		// Add build phases to the new target
-		xcodeProject.addBuildPhase(
-			sourceFiles,
-			'PBXSourcesBuildPhase',
-			'Sources',
-			newTarget.uuid
-		);
+		xcodeProject.addBuildPhase(sourceFiles, 'PBXSourcesBuildPhase', 'Sources', newTarget.uuid);
 
-		xcodeProject.addBuildPhase(
-			resourceFiles,
-			'PBXResourcesBuildPhase',
-			'Resources',
-			newTarget.uuid
-		);
+		xcodeProject.addBuildPhase(resourceFiles, 'PBXResourcesBuildPhase', 'Resources', newTarget.uuid);
 
 		xcodeProject.addBuildPhase(
 			['SwiftUI.framework', 'WidgetKit.framework'],
@@ -156,7 +149,7 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 			newTarget.uuid
 		);
 
-		// Configure build settings
+		// Set the most essential (and necessary) build settings of the new target
 		const configurations: { buildSettings: Record<string, string | number> | undefined }[] =
 			xcodeProject.pbxXCBuildConfigurationSection();
 
@@ -165,10 +158,12 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 				configuration.buildSettings = {
 					...configuration.buildSettings,
 					...BASE_BUILD_CONFIGURATION_SETTINGS,
-					INFOPLIST_FILE: `${extensionPath}/Info.plist`,
+					INFOPLIST_FILE: `${absoluteExtensionPath}/Info.plist`,
 					MARKETING_VERSION: config.version ?? '1.0.0',
 					CURRENT_PROJECT_VERSION: config.ios?.buildNumber ?? 1,
 					PRODUCT_BUNDLE_IDENTIFIER: widgetBundleId,
+					// TODO adjust
+					CODE_SIGN_ENTITLEMENTS: `${absoluteExtensionPath}/RXConnectWidget.entitlements`,
 					...props.buildSettings
 				};
 			}

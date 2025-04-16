@@ -10,17 +10,20 @@ export const withEntitlements: ConfigPlugin<WidgetsPluginProps> = (config, props
 
 	return withEntitlementsPlist(config, (newConfig) => {
 		Object.entries(entitlements).forEach(([key, value]) => {
+			console.log('key', key, 'value', value);
 			if (Array.isArray(value)) {
 				if (!Array.isArray(newConfig.modResults[key])) {
 					newConfig.modResults[key] = [];
 				}
-				if (newConfig.modResults[key].indexOf(value) === -1) {
-					newConfig.modResults[key].push(value);
-				}
+				newConfig.modResults[key].push(...value);
+				// Avoid duplicates
+				newConfig.modResults[key] = [...new Set(newConfig.modResults[key])];
 			} else {
 				newConfig.modResults[key] = value;
 			}
 		});
+
+		console.log(newConfig.modResults);
 
 		return newConfig;
 	});

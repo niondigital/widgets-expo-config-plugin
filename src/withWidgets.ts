@@ -12,11 +12,6 @@ const withWidgets: ConfigPlugin<WidgetsPluginProps> = (config, props) => {
 			'You are trying to use the Widgets plugin without the required `path` property. Please add it to your app config.'
 		);
 	}
-	if (!props.files) {
-		throw new Error(
-			'You are trying to use the Widgets plugin without the required `files` property. Please add it to your app config.'
-		);
-	}
 
 	// Set default props
 	props = {
