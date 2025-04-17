@@ -13,9 +13,15 @@ const withWidgets: ConfigPlugin<WidgetsPluginProps> = (config, props) => {
 		);
 	}
 
+	const entitlements = {
+		'com.apple.security.application-groups': [`group.${config?.ios?.bundleIdentifier || ''}.${props.name}`],
+		...props?.entitlements
+	};
+
 	// Set default props
 	props = {
-		...props
+		...props,
+		entitlements
 	};
 
 	config = withEntitlements(config, props);

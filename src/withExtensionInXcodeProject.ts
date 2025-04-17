@@ -1,6 +1,7 @@
 import { ConfigPlugin, withXcodeProject } from '@expo/config-plugins';
 import * as fs from 'fs';
 import * as path from 'path';
+import plist, { PlistObject } from 'plist';
 
 import { WidgetsPluginProps } from './types/types';
 
@@ -37,44 +38,6 @@ const BASE_BUILD_CONFIGURATION_SETTINGS = {
 };
 
 /**
- * Recursively collects all files from a directory and its subdirectories
- *
- * @param dirPath - Path to the directory
- * @param basePath - Base path for creating relative paths
- * @returns Array of file paths relative to basePath
- */
-function collectFilesFromFolder(folder: string): string[] {
-	console.log('y', folder);
-
-	console.log('folder', folder);
-	if (!fs.existsSync(folder)) {
-		console.log('not exist');
-		// TODO error
-		return [];
-	}
-
-	let files: string[] = [];
-	const entries = fs.readdirSync(folder, { withFileTypes: true });
-
-	entries.forEach((entry) => {
-		const subFolderPath = path.join(folder, entry.name);
-
-		if (entry.name.endsWith('.entitlements')) {
-			return;
-		}
-
-		if (entry.isDirectory() && !entry.name.endsWith('.xcassets')) {
-			// Recursively collect files from subdirectories
-			files = [...files, ...collectFilesFromFolder(subFolderPath)];
-		} else {
-			files.push(subFolderPath);
-		}
-	});
-
-	return files;
-}
-
-/**
  * Adds a widget extension target to the Xcode project.
  *
  * @param config - The Expo config
@@ -96,12 +59,31 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 		}
 
 		const absoluteExtensionPath = path.join(newConfig.modRequest.projectRoot, extensionPath);
-		const allFilesInPath: string[] = collectFilesFromFolder(
-			absoluteExtensionPath
+		const allFilesInPath: string[] = collectFilesFromDirectory(absoluteExtensionPath);
+
+		// If no entitlements file exists in extension path, create one
+		if (!allFilesInPath.some((file) => file.endsWith('.entitlements'))) {
+			allFilesInPath.push(writeEntitlementsFile(newConfig.modRequest.projectRoot, props));
+		}
+
+		// Filter files by type for different build phases
+		const sourceFiles = allFilesInPath.filter((file) => file.endsWith('.swift'));
+		const resourceFiles = allFilesInPath.filter(
+			(file) =>
+				file.endsWith('.xcassets') ||
+				file.endsWith('.storyboard') ||
+				file.endsWith('.xib') ||
+				file.endsWith('.strings') ||
+				file.endsWith('.json')
 		);
+		const entitlementsFile = allFilesInPath.findLast((file) => file.endsWith('.entitlements')) as string;
 
 		// Create new PBXGroup for the extension
-		const extGroup = xcodeProject.addPbxGroup(allFilesInPath, targetName, absoluteExtensionPath.replace('/Users/swe/Workspace/rx-connect-app', '..')); // TODO here wohl relativ
+		const extGroup = xcodeProject.addPbxGroup(
+			allFilesInPath,
+			targetName,
+			path.join(path.join('..', extensionPath)) // Relative to ios folder
+		);
 
 		// Add the new PBXGroup to the top level group
 		const groups: any[] = xcodeProject.hash.project.objects['PBXGroup'];
@@ -121,21 +103,6 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 
 		// Add the target
 		const newTarget = xcodeProject.addTarget(targetName, 'app_extension', targetName, widgetBundleId);
-
-		console.log('allFiles', allFilesInPath);
-
-		// Filter files by type for different build phases
-		const sourceFiles = allFilesInPath.filter((file) => file.endsWith('.swift'));
-		const resourceFiles = allFilesInPath.filter(
-			(file) =>
-				file.endsWith('.xcassets') ||
-				file.endsWith('.storyboard') ||
-				file.endsWith('.xib') ||
-				file.endsWith('.strings') ||
-				file.endsWith('.json')
-		);
-
-		console.log('sourceFiles', sourceFiles);
 
 		// Add build phases to the new target
 		xcodeProject.addBuildPhase(sourceFiles, 'PBXSourcesBuildPhase', 'Sources', newTarget.uuid);
@@ -162,8 +129,7 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 					MARKETING_VERSION: config.version ?? '1.0.0',
 					CURRENT_PROJECT_VERSION: config.ios?.buildNumber ?? 1,
 					PRODUCT_BUNDLE_IDENTIFIER: widgetBundleId,
-					// TODO adjust
-					CODE_SIGN_ENTITLEMENTS: `${absoluteExtensionPath}/RXConnectWidget.entitlements`,
+					CODE_SIGN_ENTITLEMENTS: entitlementsFile,
 					...props.buildSettings
 				};
 			}
@@ -172,3 +138,44 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 		return newConfig;
 	});
 };
+
+/**
+ * Recursively collects all files from a directory and its subdirectories
+ *
+ * @param directoryPath - Path to the directory
+ */
+function collectFilesFromDirectory(directoryPath: string): string[] {
+	if (!fs.existsSync(directoryPath)) {
+		throw new Error(`Directory does not exist: ${directoryPath}`);
+	}
+
+	let files: string[] = [];
+	const entries = fs.readdirSync(directoryPath, { withFileTypes: true });
+
+	entries.forEach((entry) => {
+		const fullPath = path.join(directoryPath, entry.name);
+
+		if (entry.isDirectory() && !entry.name.endsWith('.xcassets')) {
+			// Recursively collect files from subdirectories
+			files = [...files, ...collectFilesFromDirectory(fullPath)];
+		} else {
+			files.push(fullPath);
+		}
+	});
+
+	return files;
+}
+
+function writeEntitlementsFile(platformProjectRoot: string, props: WidgetsPluginProps) {
+	const entitlementsContent = plist.build(props.entitlements as PlistObject);
+	try {
+		const filePath = path.join(platformProjectRoot, `${props.name}.entitlements`);
+
+		fs.writeFileSync(filePath, entitlementsContent, 'utf8');
+
+		return filePath;
+	} catch (error) {
+		console.error(error);
+		throw new Error('Error writing entitlements file');
+	}
+}
