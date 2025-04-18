@@ -1,6 +1,6 @@
 export type WidgetsPluginProps = {
+	name: string;
 	path: string;
-	files: string[];
-	name?: string;
+	entitlements?: Record<string, any>;
 	buildSettings?: Record<string, string>;
 };

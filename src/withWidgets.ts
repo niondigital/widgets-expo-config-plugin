@@ -1,8 +1,8 @@
 import { ConfigPlugin } from '@expo/config-plugins';
 
 import { WidgetsPluginProps } from './types/types';
-import { withAppGroup } from './withAppGroup';
 import { withEASExtraConfig } from './withEASExtraConfig';
+import { withEntitlements } from './withEntitlements';
 import { withExtensionInXcodeProject } from './withExtensionInXcodeProject';
 
 const withWidgets: ConfigPlugin<WidgetsPluginProps> = (config, props) => {
@@ -12,19 +12,19 @@ const withWidgets: ConfigPlugin<WidgetsPluginProps> = (config, props) => {
 			'You are trying to use the Widgets plugin without the required `path` property. Please add it to your app config.'
 		);
 	}
-	if (!props.files) {
-		throw new Error(
-			'You are trying to use the Widgets plugin without the required `files` property. Please add it to your app config.'
-		);
-	}
+
+	const entitlements = {
+		'com.apple.security.application-groups': [`group.${config?.ios?.bundleIdentifier || ''}.${props.name}`],
+		...props?.entitlements
+	};
 
 	// Set default props
 	props = {
-		name: 'Widget',
-		...props
+		...props,
+		entitlements
 	};
 
-	config = withAppGroup(config, props);
+	config = withEntitlements(config, props);
 
 	config = withExtensionInXcodeProject(config, props);
 
