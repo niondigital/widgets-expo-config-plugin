@@ -78,7 +78,8 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 		);
 		const entitlementsFile = allFilesInPath.findLast((file) => file.endsWith('.entitlements')) as string;
 
-		// Create new PBXGroup for the extension
+		// Add the new PBXGroup to the top level group. This makes the
+		// files / folder appear in the file explorer in Xcode.
 		const extGroup = xcodeProject.addPbxGroup(
 			allFilesInPath,
 			targetName,
