@@ -39,19 +39,8 @@ Modify your `app.json` / `app.config.js` / `app.config.ts` to include the plugin
     [
       "@niondigital/widgets-expo-config-plugin",
       {
-        "appGroup": "SharedData",
-        "path": "widgets/ios/ExampleWidget",
-        "folders": ["intents", "widgets"], // all files within folders are added!
-        "files": [
-          "Info.plist",
-          "Assets.xcassets",
-          "AppIntent.swift",
-          "ExampleWidgetBundle.swift",
-          "ExampleWidget.swift",
-          "ExampleWidgetControl.swift",
-          "ExampleWidgetLiveActivity.swift",
-          "ExampleSharedManager.swift"
-        ]
+        "name": "MyWidget",
+        "path": "./widgets/ios/ExampleWidget"
       }
     ]
   ]
@@ -71,10 +60,10 @@ npx expo prebuild --clean
 The following properties can be configured in the plugin:
 
 | Property        | Required     | Description                                                                                               |
-| --------------- | ------------ | --------------------------------------------------------------------------------------------------------- |
-| `name`          | Optional     | The name of the widget extension.                                                                         |
-| `path`          | **Required** | The path to the directory containing the widget files.                                                    |
-| `files`         | **Required** | A list of files to add to the project.                                                                    |
+| --------------- |--------------|-----------------------------------------------------------------------------------------------------------|
+| `name`          | **Required** | The name of the widget extension.                                                                         |
+| `path`          | **Required** | The path to the directory containing the widget files, relative to the project root.                      |
+| `entitlements`  | Optional     | A key-value object of entitlements to add to the main target and widget target.                           |
 | `buildSettings` | Optional     | A key-value object to override default build settings (e.g., `{ "IPHONEOS_DEPLOYMENT_TARGET": "17.0" }`). |
 
 ## FAQ
