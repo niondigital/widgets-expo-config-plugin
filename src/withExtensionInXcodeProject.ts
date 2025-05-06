@@ -63,7 +63,7 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 
 		// If no entitlements file exists in extension path, create one
 		if (!allFilesInPath.some((file) => file.endsWith('.entitlements'))) {
-			allFilesInPath.push(writeEntitlementsFile(newConfig.modRequest.projectRoot, props));
+			allFilesInPath.push(writeEntitlementsFile(newConfig.modRequest.platformProjectRoot, props));
 		}
 
 		// Filter files by type for different build phases
