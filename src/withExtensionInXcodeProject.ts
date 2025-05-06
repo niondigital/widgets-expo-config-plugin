@@ -60,15 +60,19 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 
 		const absoluteExtensionPath = path.join(newConfig.modRequest.projectRoot, extensionPath);
 		const allFilesInPath: string[] = collectFilesFromDirectory(absoluteExtensionPath);
+		const additionalFiles: string[] = (props.additionalFiles || []).map((file) =>
+			path.join(newConfig.modRequest.projectRoot, file)
+		);
+		const allFiles: string[] = [...allFilesInPath, ...additionalFiles];
 
 		// If no entitlements file exists in extension path, create one
-		if (!allFilesInPath.some((file) => file.endsWith('.entitlements'))) {
-			allFilesInPath.push(writeEntitlementsFile(newConfig.modRequest.platformProjectRoot, props));
+		if (!allFiles.some((file) => file.endsWith('.entitlements'))) {
+			allFiles.push(writeEntitlementsFile(newConfig.modRequest.platformProjectRoot, props));
 		}
 
 		// Filter files by type for different build phases
-		const sourceFiles = allFilesInPath.filter((file) => file.endsWith('.swift'));
-		const resourceFiles = allFilesInPath.filter(
+		const sourceFiles = allFiles.filter((file) => file.endsWith('.swift'));
+		const resourceFiles = allFiles.filter(
 			(file) =>
 				file.endsWith('.xcassets') ||
 				file.endsWith('.storyboard') ||
@@ -76,12 +80,12 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 				file.endsWith('.strings') ||
 				file.endsWith('.json')
 		);
-		const entitlementsFile = allFilesInPath.findLast((file) => file.endsWith('.entitlements')) as string;
+		const entitlementsFile = allFiles.findLast((file) => file.endsWith('.entitlements')) as string;
 
 		// Add the new PBXGroup to the top level group. This makes the
 		// files / folder appear in the file explorer in Xcode.
 		const extGroup = xcodeProject.addPbxGroup(
-			allFilesInPath,
+			allFiles,
 			targetName,
 			path.join(path.join('..', extensionPath)) // Relative to ios folder
 		);

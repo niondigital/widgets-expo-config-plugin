@@ -59,12 +59,13 @@ npx expo prebuild --clean
 
 The following properties can be configured in the plugin:
 
-| Property        | Required     | Description                                                                                               |
-| --------------- |--------------|-----------------------------------------------------------------------------------------------------------|
-| `name`          | **Required** | The name of the widget extension.                                                                         |
-| `path`          | **Required** | The path to the directory containing the widget files, relative to the project root.                      |
-| `entitlements`  | Optional     | A key-value object of entitlements to add to the main target and widget target.                           |
-| `buildSettings` | Optional     | A key-value object to override default build settings (e.g., `{ "IPHONEOS_DEPLOYMENT_TARGET": "17.0" }`). |
+| Property          | Required     | Description                                                                                               |
+|-------------------|--------------|-----------------------------------------------------------------------------------------------------------|
+| `name`            | **Required** | The name of the widget extension.                                                                         |
+| `path`            | **Required** | The path to the directory containing the widget files, relative to the project root.                      |
+| `additionalFiles` | Optional     | List of additional files that should be added to the target (e.g. shared classes like a bridge)           |
+| `entitlements`    | Optional     | A key-value object of entitlements to add to the main target and widget target.                           |
+| `buildSettings`   | Optional     | A key-value object to override default build settings (e.g., `{ "IPHONEOS_DEPLOYMENT_TARGET": "17.0" }`). |
 
 ## FAQ
 
