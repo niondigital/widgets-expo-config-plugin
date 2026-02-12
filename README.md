@@ -27,6 +27,8 @@ yarn add @niondigital/widgets-expo-config-plugin
 
 Copy the files from the `example/ios/ExampleWidget` directory into your project's directory.
 
+> **Important:** Your widget directory must include a complete `Info.plist` with build variable references (like `$(CURRENT_PROJECT_VERSION)` and `$(MARKETING_VERSION)`). The example `Info.plist` already includes these. This is required for `agvtool` (used by EAS Build) to correctly sync version numbers between your app and the widget extension.
+
 ### 2. Add and Configure the Plugin
 
 Modify your `app.json` / `app.config.js` / `app.config.ts` to include the plugin configuration. Ensure the `path` property points to the directory where you copied the example widget files.
