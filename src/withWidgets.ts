@@ -13,9 +13,21 @@ const withWidgets: ConfigPlugin<WidgetsPluginProps> = (config, props) => {
 		);
 	}
 
+	if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(props.name)) {
+		throw new Error(
+			`Invalid widget name "${props.name}". Name must start with a letter and contain only letters, numbers, hyphens, and underscores.`
+		);
+	}
+
 	if (!props.path) {
 		throw new Error(
 			'You are trying to use the Widgets plugin without the required `path` property. Please add it to your app config.'
+		);
+	}
+
+	if (!config.ios?.bundleIdentifier) {
+		throw new Error(
+			'ios.bundleIdentifier is required in your app config when using the Widgets plugin. Without it, the widget bundle ID and app group cannot be generated.'
 		);
 	}
 

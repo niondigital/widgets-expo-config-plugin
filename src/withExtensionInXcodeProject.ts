@@ -250,6 +250,9 @@ function ensureAppGroupInEntitlements(entitlementsPath: string, appGroup: string
 			console.log(`Added app group ${appGroup} to existing entitlements at ${entitlementsPath}`);
 		}
 	} catch (error) {
-		console.warn(`Warning: Could not read/update entitlements at ${entitlementsPath}: ${error}`);
+		throw new Error(
+			`Could not read/update entitlements at ${entitlementsPath}: ${error}. ` +
+				'The entitlements file is required for app group communication between your app and widget.'
+		);
 	}
 }
