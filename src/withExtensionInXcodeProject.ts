@@ -117,6 +117,7 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 				file.endsWith('.storyboard') ||
 				file.endsWith('.xib') ||
 				file.endsWith('.strings') ||
+				file.endsWith('.intentdefinition') ||
 				file.endsWith('.json')
 		);
 
@@ -228,8 +229,7 @@ function writeEntitlementsFile(platformProjectRoot: string, props: WidgetsPlugin
 		fs.writeFileSync(filePath, entitlementsContent, 'utf8');
 		return filePath;
 	} catch (error) {
-		console.error(error);
-		throw new Error(`Error writing entitlements file to ${filePath}`);
+		throw new Error(`Error writing entitlements file to ${filePath}`, { cause: error });
 	}
 }
 
@@ -251,8 +251,9 @@ function ensureAppGroupInEntitlements(entitlementsPath: string, appGroup: string
 		}
 	} catch (error) {
 		throw new Error(
-			`Could not read/update entitlements at ${entitlementsPath}: ${error}. ` +
-				'The entitlements file is required for app group communication between your app and widget.'
+			`Could not read/update entitlements at ${entitlementsPath}. ` +
+				'The entitlements file is required for app group communication between your app and widget.',
+			{ cause: error }
 		);
 	}
 }

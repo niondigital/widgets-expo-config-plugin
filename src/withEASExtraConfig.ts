@@ -18,10 +18,7 @@ export const withEASExtraConfig: ConfigPlugin<WidgetsPluginProps> = (config, pro
 		{
 			targetName,
 			bundleIdentifier: widgetBundleId,
-			entitlements: {
-				'com.apple.security.application-groups': [`group.${config?.ios?.bundleIdentifier}.${props.name}`],
-				...props?.entitlements
-			}
+			entitlements: props.entitlements ?? {}
 		}
 	];
 
