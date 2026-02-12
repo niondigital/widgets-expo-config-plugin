@@ -6,9 +6,9 @@ import plist, { PlistObject } from 'plist';
 import { WidgetsPluginProps } from './types/types';
 
 /**
- * Default build configuration settings for widget extensions
+ * Common build configuration settings shared between Debug and Release
  */
-const BASE_BUILD_CONFIGURATION_SETTINGS = {
+const COMMON_BUILD_SETTINGS = {
 	ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: 'AccentColor',
 	ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME: 'WidgetBackground',
 	CLANG_ANALYZER_NONNULL: 'YES',
@@ -19,22 +19,40 @@ const BASE_BUILD_CONFIGURATION_SETTINGS = {
 	CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER: 'YES',
 	CLANG_WARN_UNGUARDED_AVAILABILITY: 'YES_AGGRESSIVE',
 	CODE_SIGN_STYLE: 'Automatic',
-	DEBUG_INFORMATION_FORMAT: 'dwarf',
 	GCC_C_LANGUAGE_STANDARD: 'gnu11',
 	GENERATE_INFOPLIST_FILE: 'YES',
 	INFOPLIST_KEY_CFBundleDisplayName: 'widget',
 	INFOPLIST_KEY_NSHumanReadableCopyright: '""',
 	IPHONEOS_DEPLOYMENT_TARGET: '18.0',
 	LD_RUNPATH_SEARCH_PATHS: '"$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"',
-	MTL_ENABLE_DEBUG_INFO: 'INCLUDE_SOURCE',
 	MTL_FAST_MATH: 'YES',
 	PRODUCT_NAME: '"$(TARGET_NAME)"',
 	SKIP_INSTALL: 'YES',
-	SWIFT_ACTIVE_COMPILATION_CONDITIONS: 'DEBUG',
 	SWIFT_EMIT_LOC_STRINGS: 'YES',
-	SWIFT_OPTIMIZATION_LEVEL: '-Onone',
 	SWIFT_VERSION: '5.0',
 	TARGETED_DEVICE_FAMILY: '"1,2"'
+};
+
+/**
+ * Debug-specific build settings
+ */
+const DEBUG_BUILD_SETTINGS = {
+	...COMMON_BUILD_SETTINGS,
+	DEBUG_INFORMATION_FORMAT: 'dwarf',
+	MTL_ENABLE_DEBUG_INFO: 'INCLUDE_SOURCE',
+	SWIFT_ACTIVE_COMPILATION_CONDITIONS: 'DEBUG',
+	SWIFT_OPTIMIZATION_LEVEL: '-Onone'
+};
+
+/**
+ * Release-specific build settings
+ */
+const RELEASE_BUILD_SETTINGS = {
+	...COMMON_BUILD_SETTINGS,
+	DEBUG_INFORMATION_FORMAT: '"dwarf-with-dsym"',
+	MTL_ENABLE_DEBUG_INFO: 'NO',
+	SWIFT_ACTIVE_COMPILATION_CONDITIONS: '"$(inherited)"',
+	SWIFT_OPTIMIZATION_LEVEL: '-O'
 };
 
 /**
@@ -58,37 +76,67 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 			return newConfig;
 		}
 
-		const absoluteExtensionPath = path.join(newConfig.modRequest.projectRoot, extensionPath);
-		const allFilesInPath: string[] = collectFilesFromDirectory(absoluteExtensionPath);
-		const additionalFiles: string[] = (props.additionalFiles || []).map((file) =>
-			path.join(newConfig.modRequest.projectRoot, file)
-		);
-		const allFiles: string[] = [...allFilesInPath, ...additionalFiles];
+		const projectRoot = newConfig.modRequest.projectRoot;
+		const platformProjectRoot = newConfig.modRequest.platformProjectRoot;
+		const absoluteExtensionPath = path.join(projectRoot, extensionPath);
 
-		// If no entitlements file exists in extension path, create one
-		if (!allFiles.some((file) => file.endsWith('.entitlements'))) {
-			allFiles.push(writeEntitlementsFile(newConfig.modRequest.platformProjectRoot, props));
+		// Collect files from extension directory (absolute paths for validation)
+		const absoluteFilesInPath: string[] = collectFilesFromDirectory(absoluteExtensionPath);
+
+		// Validate and resolve additional files
+		const absoluteAdditionalFiles: string[] = (props.additionalFiles || []).map((file) => {
+			const absolutePath = path.join(projectRoot, file);
+			if (!fs.existsSync(absolutePath)) {
+				throw new Error(
+					`Additional file does not exist: ${file}. Please check the path in your plugin configuration.`
+				);
+			}
+			return absolutePath;
+		});
+
+		const absoluteAllFiles: string[] = [...absoluteFilesInPath, ...absoluteAdditionalFiles];
+
+		// Handle entitlements: ensure app group is present or create new file
+		const appGroup = `group.${config?.ios?.bundleIdentifier || ''}.${props.name}`;
+		const existingEntitlementsFile = absoluteAllFiles.find((file) => file.endsWith('.entitlements'));
+
+		if (existingEntitlementsFile) {
+			ensureAppGroupInEntitlements(existingEntitlementsFile, appGroup);
+		} else {
+			absoluteAllFiles.push(writeEntitlementsFile(platformProjectRoot, props));
 		}
 
+		// Convert all paths to relative (to extension directory) for PBXGroup file references
+		const relativeFiles = absoluteAllFiles.map((file) => path.relative(absoluteExtensionPath, file));
+
 		// Filter files by type for different build phases
-		const sourceFiles = allFiles.filter((file) => file.endsWith('.swift'));
-		const resourceFiles = allFiles.filter(
+		const sourceFiles = relativeFiles.filter((file) => file.endsWith('.swift'));
+		const resourceFiles = relativeFiles.filter(
 			(file) =>
 				file.endsWith('.xcassets') ||
 				file.endsWith('.storyboard') ||
 				file.endsWith('.xib') ||
 				file.endsWith('.strings') ||
+				file.endsWith('.intentdefinition') ||
 				file.endsWith('.json')
 		);
-		const entitlementsFile = allFiles.findLast((file) => file.endsWith('.entitlements')) as string;
+
+		// Paths for build settings (relative to platformProjectRoot = $(SRCROOT))
+		const entitlementsAbsolutePath = absoluteAllFiles.findLast((file) =>
+			file.endsWith('.entitlements')
+		) as string;
+		const entitlementsPathForBuildSettings = path.relative(platformProjectRoot, entitlementsAbsolutePath);
+		const infoPlistPathForBuildSettings = path.relative(
+			platformProjectRoot,
+			path.join(absoluteExtensionPath, 'Info.plist')
+		);
+
+		// PBXGroup path relative to ios folder
+		const groupPath = path.join('..', extensionPath);
 
 		// Add the new PBXGroup to the top level group. This makes the
 		// files / folder appear in the file explorer in Xcode.
-		const extGroup = xcodeProject.addPbxGroup(
-			allFiles,
-			targetName,
-			path.join(path.join('..', extensionPath)) // Relative to ios folder
-		);
+		const extGroup = xcodeProject.addPbxGroup(relativeFiles, targetName, groupPath);
 
 		// Add the new PBXGroup to the top level group
 		const groups: any[] = xcodeProject.hash.project.objects['PBXGroup'];
@@ -121,20 +169,22 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 			newTarget.uuid
 		);
 
-		// Set the most essential (and necessary) build settings of the new target
-		const configurations: { buildSettings: Record<string, string | number> | undefined }[] =
-			xcodeProject.pbxXCBuildConfigurationSection();
+		// Apply build settings per configuration (Debug vs Release)
+		const configurations = xcodeProject.pbxXCBuildConfigurationSection();
 
-		Object.values(configurations).forEach((configuration) => {
-			if (configuration.buildSettings?.PRODUCT_NAME === `"${targetName}"`) {
+		Object.values(configurations).forEach((configuration: any) => {
+			if (typeof configuration === 'object' && configuration.buildSettings?.PRODUCT_NAME === `"${targetName}"`) {
+				const isDebug = configuration.name === 'Debug';
+				const baseSettings = isDebug ? DEBUG_BUILD_SETTINGS : RELEASE_BUILD_SETTINGS;
+
 				configuration.buildSettings = {
 					...configuration.buildSettings,
-					...BASE_BUILD_CONFIGURATION_SETTINGS,
-					INFOPLIST_FILE: `${absoluteExtensionPath}/Info.plist`,
+					...baseSettings,
+					INFOPLIST_FILE: infoPlistPathForBuildSettings,
 					MARKETING_VERSION: config.version ?? '1.0.0',
-					CURRENT_PROJECT_VERSION: config.ios?.buildNumber ?? 1,
+					CURRENT_PROJECT_VERSION: config.ios?.buildNumber ?? '1',
 					PRODUCT_BUNDLE_IDENTIFIER: widgetBundleId,
-					CODE_SIGN_ENTITLEMENTS: entitlementsFile,
+					CODE_SIGN_ENTITLEMENTS: entitlementsPathForBuildSettings,
 					...props.buildSettings
 				};
 			}
@@ -171,16 +221,39 @@ function collectFilesFromDirectory(directoryPath: string): string[] {
 	return files;
 }
 
-function writeEntitlementsFile(platformProjectRoot: string, props: WidgetsPluginProps) {
+function writeEntitlementsFile(platformProjectRoot: string, props: WidgetsPluginProps): string {
 	const entitlementsContent = plist.build(props.entitlements as PlistObject);
+	const filePath = path.join(platformProjectRoot, `${props.name}.entitlements`);
+
 	try {
-		const filePath = path.join(platformProjectRoot, `${props.name}.entitlements`);
-
 		fs.writeFileSync(filePath, entitlementsContent, 'utf8');
-
 		return filePath;
 	} catch (error) {
-		console.error(error);
-		throw new Error('Error writing entitlements file');
+		throw new Error(`Error writing entitlements file to ${filePath}`, { cause: error });
+	}
+}
+
+/**
+ * Ensures that the specified app group is present in an existing entitlements file.
+ * If the app group is missing, it is added and the file is updated.
+ */
+function ensureAppGroupInEntitlements(entitlementsPath: string, appGroup: string): void {
+	try {
+		const content = fs.readFileSync(entitlementsPath, 'utf8');
+		const entitlements = plist.parse(content) as Record<string, any>;
+
+		const groups: string[] = entitlements['com.apple.security.application-groups'] || [];
+		if (!groups.includes(appGroup)) {
+			groups.push(appGroup);
+			entitlements['com.apple.security.application-groups'] = groups;
+			fs.writeFileSync(entitlementsPath, plist.build(entitlements as PlistObject), 'utf8');
+			console.log(`Added app group ${appGroup} to existing entitlements at ${entitlementsPath}`);
+		}
+	} catch (error) {
+		throw new Error(
+			`Could not read/update entitlements at ${entitlementsPath}. ` +
+				'The entitlements file is required for app group communication between your app and widget.',
+			{ cause: error }
+		);
 	}
 }

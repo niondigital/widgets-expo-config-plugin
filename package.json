@@ -29,6 +29,9 @@
   "bugs": {
     "url": "https://github.com/niondigital/widgets-expo-config-plugin/issues"
   },
+  "peerDependencies": {
+    "@expo/config-plugins": ">=7.0.0"
+  },
   "dependencies": {
     "plist": "^3.1.0"
   }
