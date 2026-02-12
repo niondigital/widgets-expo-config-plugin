@@ -117,6 +117,7 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 				file.endsWith('.storyboard') ||
 				file.endsWith('.xib') ||
 				file.endsWith('.strings') ||
+				file.endsWith('.xcstrings') ||
 				file.endsWith('.intentdefinition') ||
 				file.endsWith('.json')
 		);
