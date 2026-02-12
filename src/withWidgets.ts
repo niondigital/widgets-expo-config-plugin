@@ -7,6 +7,12 @@ import { withExtensionInXcodeProject } from './withExtensionInXcodeProject';
 
 const withWidgets: ConfigPlugin<WidgetsPluginProps> = (config, props) => {
 	// Validate props
+	if (!props.name) {
+		throw new Error(
+			'You are trying to use the Widgets plugin without the required `name` property. Please add it to your app config.'
+		);
+	}
+
 	if (!props.path) {
 		throw new Error(
 			'You are trying to use the Widgets plugin without the required `path` property. Please add it to your app config.'
