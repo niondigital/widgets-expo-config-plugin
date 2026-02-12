@@ -181,7 +181,7 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 					...baseSettings,
 					INFOPLIST_FILE: infoPlistPathForBuildSettings,
 					MARKETING_VERSION: config.version ?? '1.0.0',
-					CURRENT_PROJECT_VERSION: config.ios?.buildNumber ?? 1,
+					CURRENT_PROJECT_VERSION: config.ios?.buildNumber ?? '1',
 					PRODUCT_BUNDLE_IDENTIFIER: widgetBundleId,
 					CODE_SIGN_ENTITLEMENTS: entitlementsPathForBuildSettings,
 					...props.buildSettings
