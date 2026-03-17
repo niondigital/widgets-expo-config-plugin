@@ -27,6 +27,7 @@ The plugin is a single pipeline of three Expo config modifiers, orchestrated in 
    - Creating PBXGroup with relative file paths, adding the target as `app_extension`, adding Sources/Resources/Frameworks build phases
    - Applying separate Debug/Release build settings (`DEBUG_BUILD_SETTINGS` / `RELEASE_BUILD_SETTINGS` + user overrides via `buildSettings`)
    - All paths in build settings (INFOPLIST_FILE, CODE_SIGN_ENTITLEMENTS) are relative to `$(SRCROOT)`
+   - Optionally adding SPM (Swift Package Manager) dependencies to the widget target via direct `xcodeProject.hash.project.objects` manipulation (the `xcode` library has no built-in SPM support)
    - Includes a workaround for a `cordova-node-xcode` bug with `PBXTargetDependency`/`PBXContainerItemProxy`
 
 3. **`withEASExtraConfig`** (`src/withEASExtraConfig.ts`) — Registers the widget extension in `extra.eas.build.experimental.ios.appExtensions` so EAS CLI can generate correct credentials before the build.
@@ -40,6 +41,7 @@ The plugin is a single pipeline of three Expo config modifiers, orchestrated in 
   additionalFiles?: string[];   // Extra files to include in the target
   entitlements?: Record<string, any>;  // Custom entitlements (merged with auto-generated app group)
   buildSettings?: Record<string, string>;  // Xcode build setting overrides
+  spmPackages?: { url: string; version: string; product: string }[];  // SPM dependencies for the widget target
 }
 ```
 
@@ -50,3 +52,4 @@ The plugin is a single pipeline of three Expo config modifiers, orchestrated in 
 - The entry point is `app.plugin.js` which requires `build/withWidgets.js` — you must run `npm run build` after source changes
 - `.xcassets` directories are collected as single resource files (not recursed into)
 - The plugin skips target creation if a target with the same name already exists
+- SPM packages are added via direct hash manipulation (`addSpmPackages` in `withExtensionInXcodeProject.ts`), creating `XCRemoteSwiftPackageReference`, `XCSwiftPackageProductDependency`, and `PBXBuildFile` entries. Idempotent — skips packages whose URL already exists in the project.

@@ -189,9 +189,120 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 			}
 		});
 
+		// Add SPM packages to the widget target if configured
+		if (props.spmPackages?.length) {
+			addSpmPackages(xcodeProject, targetName, newTarget.uuid, props.spmPackages);
+		}
+
 		return newConfig;
 	});
 };
+
+/**
+ * Adds Swift Package Manager dependencies to the widget extension target.
+ * Directly manipulates the Xcode project hash since cordova-node-xcode has no SPM support.
+ */
+function addSpmPackages(
+	xcodeProject: any,
+	targetName: string,
+	targetUuid: string,
+	spmPackages: NonNullable<WidgetsPluginProps['spmPackages']>
+): void {
+	const projObjects = xcodeProject.hash.project.objects;
+	projObjects['XCRemoteSwiftPackageReference'] = projObjects['XCRemoteSwiftPackageReference'] || {};
+	projObjects['XCSwiftPackageProductDependency'] = projObjects['XCSwiftPackageProductDependency'] || {};
+
+	const rootProjectKey = xcodeProject.hash.project.rootObject;
+	const rootProject = projObjects['PBXProject'][rootProjectKey];
+	rootProject.packageReferences = rootProject.packageReferences || [];
+
+	const nativeTargets = projObjects['PBXNativeTarget'];
+	const widgetTarget = Object.values(nativeTargets).find(
+		(val: any) => typeof val === 'object' && val.name === `"${targetName}"`
+	) as any;
+
+	if (!widgetTarget) {
+		throw new Error(`Could not find PBXNativeTarget for "${targetName}"`);
+	}
+
+	widgetTarget.packageProductDependencies = widgetTarget.packageProductDependencies || [];
+
+	// Find the Frameworks build phase belonging to the widget target
+	const frameworksBuildPhases = projObjects['PBXFrameworksBuildPhase'];
+	let widgetFrameworksPhase: any = null;
+	for (const bp of widgetTarget.buildPhases) {
+		const phase = frameworksBuildPhases[bp.value];
+		if (phase && phase.isa === 'PBXFrameworksBuildPhase') {
+			widgetFrameworksPhase = phase;
+			break;
+		}
+	}
+
+	for (const pkg of spmPackages) {
+		// Idempotency: check if a package reference with the same URL already exists
+		const existingRefUuid = Object.entries(projObjects['XCRemoteSwiftPackageReference']).find(
+			([key, val]: [string, any]) =>
+				typeof val === 'object' && val.repositoryURL === `"${pkg.url}"` || val.repositoryURL === pkg.url
+		)?.[0];
+
+		if (existingRefUuid) {
+			console.log(`SPM package ${pkg.url} already exists in project. Skipping...`);
+			continue;
+		}
+
+		// 1. XCRemoteSwiftPackageReference
+		const packageRefUuid = xcodeProject.generateUuid();
+		projObjects['XCRemoteSwiftPackageReference'][packageRefUuid] = {
+			isa: 'XCRemoteSwiftPackageReference',
+			repositoryURL: `"${pkg.url}"`,
+			requirement: {
+				kind: 'upToNextMajorVersion',
+				minimumVersion: pkg.version
+			}
+		};
+		projObjects['XCRemoteSwiftPackageReference'][`${packageRefUuid}_comment`] =
+			`XCRemoteSwiftPackageReference "${pkg.product}"`;
+
+		// 2. Add to root project's packageReferences
+		rootProject.packageReferences.push({
+			value: packageRefUuid,
+			comment: `XCRemoteSwiftPackageReference "${pkg.product}"`
+		});
+
+		// 3. XCSwiftPackageProductDependency
+		const productDepUuid = xcodeProject.generateUuid();
+		projObjects['XCSwiftPackageProductDependency'][productDepUuid] = {
+			isa: 'XCSwiftPackageProductDependency',
+			package: packageRefUuid,
+			productName: pkg.product
+		};
+		projObjects['XCSwiftPackageProductDependency'][`${productDepUuid}_comment`] = pkg.product;
+
+		// Add to widget target's packageProductDependencies
+		widgetTarget.packageProductDependencies.push({
+			value: productDepUuid,
+			comment: pkg.product
+		});
+
+		// 4. PBXBuildFile with productRef (links product in Frameworks phase)
+		const buildFileUuid = xcodeProject.generateUuid();
+		projObjects['PBXBuildFile'][buildFileUuid] = {
+			isa: 'PBXBuildFile',
+			productRef: productDepUuid,
+			productRef_comment: pkg.product
+		};
+		projObjects['PBXBuildFile'][`${buildFileUuid}_comment`] = `${pkg.product} in Frameworks`;
+
+		// Add to Frameworks build phase
+		if (widgetFrameworksPhase) {
+			widgetFrameworksPhase.files = widgetFrameworksPhase.files || [];
+			widgetFrameworksPhase.files.push({
+				value: buildFileUuid,
+				comment: `${pkg.product} in Frameworks`
+			});
+		}
+	}
+}
 
 /**
  * Recursively collects all files from a directory and its subdirectories
