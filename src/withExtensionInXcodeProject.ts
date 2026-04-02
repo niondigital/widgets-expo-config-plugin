@@ -320,10 +320,8 @@ function addSpmPackages(
  * target embeds these automatically, but extension targets added via config
  * plugins do not — causing a dyld "Library missing" crash at runtime.
  *
- * In release builds SPM typically uses static linking so no .framework files
- * exist and the script is a no-op. However, packages that declare `type: .dynamic`
- * in their Package.swift will produce dynamic frameworks even in release builds —
- * the script handles that case correctly.
+ * The script only runs in debug builds. In release builds SPM uses static linking
+ * and Apple rejects extensions that contain a Frameworks/ directory.
  *
  * Searches PackageFrameworks/ first (Xcode's dedicated SPM output dir), then
  * BUILT_PRODUCTS_DIR/ as fallback since some setups (e.g. Expo/React Native)
@@ -346,6 +344,12 @@ function addEmbedSpmFrameworksScriptPhase(xcodeProject: any, targetName: string)
 	const rawScript = [
 		'set -euo pipefail',
 		'# Copy SPM dynamic frameworks into the extension bundle.',
+		'# Only needed in debug builds — release builds use static linking.',
+		'# Apple rejects extensions with a Frameworks/ directory in production.',
+		'if [ "${CONFIGURATION}" != "Debug" ]; then',
+		'  echo "[Embed SPM] Skipping — not a debug build (${CONFIGURATION})"',
+		'  exit 0',
+		'fi',
 		'# Searches PackageFrameworks/ first (Xcode dedicated SPM output dir),',
 		'# then BUILT_PRODUCTS_DIR/ as fallback (some setups place frameworks there directly).',
 		'EXT_FW_DIR="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}"',
