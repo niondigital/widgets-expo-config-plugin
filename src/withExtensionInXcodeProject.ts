@@ -192,6 +192,13 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 		// Add SPM packages to the widget target if configured
 		if (props.spmPackages?.length) {
 			addSpmPackages(xcodeProject, targetName, newTarget.uuid, props.spmPackages);
+
+			// In debug builds, Xcode compiles SPM packages as dynamic frameworks
+			// placed in PackageFrameworks/. The main app target gets these embedded
+			// automatically, but extension targets added via config plugins do not.
+			// This script phase copies any SPM package frameworks into the extension
+			// bundle so dyld can find them at runtime.
+			addEmbedSpmFrameworksScriptPhase(xcodeProject, targetName);
 		}
 
 		return newConfig;
@@ -242,7 +249,7 @@ function addSpmPackages(
 		// Idempotency: check if a package reference with the same URL already exists
 		const existingRefUuid = Object.entries(projObjects['XCRemoteSwiftPackageReference']).find(
 			([key, val]: [string, any]) =>
-				typeof val === 'object' && val.repositoryURL === `"${pkg.url}"` || val.repositoryURL === pkg.url
+				typeof val === 'object' && (val.repositoryURL === `"${pkg.url}"` || val.repositoryURL === pkg.url)
 		)?.[0];
 
 		if (existingRefUuid) {
@@ -302,6 +309,91 @@ function addSpmPackages(
 			});
 		}
 	}
+}
+
+/**
+ * Adds a "Run Script" build phase to the widget target that copies SPM package
+ * frameworks into the extension's Frameworks directory.
+ *
+ * In debug builds, Xcode compiles SPM packages as dynamic frameworks and places
+ * them in DerivedData/Build/Products/<config>/PackageFrameworks/. The main app
+ * target embeds these automatically, but extension targets added via config
+ * plugins do not — causing a dyld "Library missing" crash at runtime.
+ *
+ * In release builds SPM typically uses static linking so no .framework files
+ * exist and the script is a no-op. However, packages that declare `type: .dynamic`
+ * in their Package.swift will produce dynamic frameworks even in release builds —
+ * the script handles that case correctly.
+ *
+ * Searches PackageFrameworks/ first (Xcode's dedicated SPM output dir), then
+ * BUILT_PRODUCTS_DIR/ as fallback since some setups (e.g. Expo/React Native)
+ * place SPM dynamic frameworks there directly. Frameworks already copied from
+ * PackageFrameworks/ are skipped in the second pass (deduplication).
+ */
+function addEmbedSpmFrameworksScriptPhase(xcodeProject: any, targetName: string): void {
+	const nativeTargets = xcodeProject.hash.project.objects['PBXNativeTarget'];
+	const widgetTarget = Object.values(nativeTargets).find(
+		(val: any) => typeof val === 'object' && val.name === `"${targetName}"`
+	) as any;
+
+	if (!widgetTarget) {
+		throw new Error(`Could not find PBXNativeTarget for "${targetName}"`);
+	}
+
+	const projObjects = xcodeProject.hash.project.objects;
+	projObjects['PBXShellScriptBuildPhase'] = projObjects['PBXShellScriptBuildPhase'] || {};
+
+	const rawScript = [
+		'set -euo pipefail',
+		'# Copy SPM dynamic frameworks into the extension bundle.',
+		'# Searches PackageFrameworks/ first (Xcode dedicated SPM output dir),',
+		'# then BUILT_PRODUCTS_DIR/ as fallback (some setups place frameworks there directly).',
+		'EXT_FW_DIR="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}"',
+		'COPIED=0',
+		'COPIED_NAMES=""',
+		'for search_dir in "${BUILT_PRODUCTS_DIR}/PackageFrameworks" "${BUILT_PRODUCTS_DIR}"; do',
+		'  [ -d "${search_dir}" ] || continue',
+		'  for fw in "${search_dir}/"*.framework; do',
+		'    [ -e "${fw}" ] || continue',
+		'    FW_BASE=$(basename "${fw}")',
+		'    echo "${COPIED_NAMES}" | grep -qF "${FW_BASE}" && continue',
+		'    mkdir -p "${EXT_FW_DIR}"',
+		'    ditto "${fw}" "${EXT_FW_DIR}/${FW_BASE}"',
+		'    if [ -n "${EXPANDED_CODE_SIGN_IDENTITY}" ]; then',
+		'      codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" --preserve-metadata=identifier,entitlements --timestamp=none "${EXT_FW_DIR}/${FW_BASE}" || {',
+		'        echo "[Embed SPM] ERROR: codesign failed for ${FW_BASE}" >&2',
+		'        exit 1',
+		'      }',
+		'    fi',
+		'    COPIED_NAMES="${COPIED_NAMES} ${FW_BASE}"',
+		'    COPIED=$((COPIED+1))',
+		'  done',
+		'done',
+		'echo "[Embed SPM] Copied ${COPIED} framework(s) into extension bundle"'
+	].join('\n');
+
+	// Apply pbxproj encoding: escape double quotes and convert newlines
+	const pbxprojScript = rawScript.replace(/"/g, '\\"').replace(/\n/g, '\\n');
+
+	const scriptPhaseUuid = xcodeProject.generateUuid();
+	projObjects['PBXShellScriptBuildPhase'][scriptPhaseUuid] = {
+		isa: 'PBXShellScriptBuildPhase',
+		buildActionMask: 2147483647,
+		files: [],
+		inputPaths: ['"$(BUILT_PRODUCTS_DIR)/PackageFrameworks"'],
+		name: '"Embed SPM Package Frameworks"',
+		outputPaths: ['"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)"'],
+		runOnlyForDeploymentPostprocessing: 0,
+		shellPath: '/bin/sh',
+		shellScript: `"${pbxprojScript}"`,
+		showEnvVarsInLog: 0
+	};
+	projObjects['PBXShellScriptBuildPhase'][`${scriptPhaseUuid}_comment`] = 'Embed SPM Package Frameworks';
+
+	widgetTarget.buildPhases.push({
+		value: scriptPhaseUuid,
+		comment: 'Embed SPM Package Frameworks'
+	});
 }
 
 /**
