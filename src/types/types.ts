@@ -4,9 +4,4 @@ export type WidgetsPluginProps = {
 	additionalFiles?: string[];
 	entitlements?: Record<string, any>;
 	buildSettings?: Record<string, string>;
-	spmPackages?: {
-		url: string;
-		version: string;
-		product: string;
-	}[];
 };

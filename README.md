@@ -68,40 +68,6 @@ The following properties can be configured in the plugin:
 | `additionalFiles` | Optional     | List of additional files that should be added to the target (e.g. shared classes like a bridge)           |
 | `entitlements`    | Optional     | A key-value object of entitlements to add to the main target and widget target.                           |
 | `buildSettings`   | Optional     | A key-value object to override default build settings (e.g., `{ "IPHONEOS_DEPLOYMENT_TARGET": "17.0" }`). |
-| `spmPackages`     | Optional     | List of Swift Package Manager dependencies to add to the widget target (see below).                       |
-
-### SPM Packages
-
-You can add Swift Package Manager dependencies to the widget target using the `spmPackages` property. Each entry requires:
-
-| Property  | Description                                                        |
-|-----------|--------------------------------------------------------------------|
-| `url`     | Git repository URL of the Swift package.                           |
-| `version` | Minimum version for `upToNextMajorVersion` resolution.             |
-| `product` | The SPM product name to link against.                              |
-
-#### Example
-
-```json
-{
-  "plugins": [
-    [
-      "@niondigital/widgets-expo-config-plugin",
-      {
-        "name": "MyWidget",
-        "path": "./widgets/ios/MyWidget",
-        "spmPackages": [
-          {
-            "url": "https://github.com/amplitude/Amplitude-Swift",
-            "version": "1.11.4",
-            "product": "AmplitudeSwift"
-          }
-        ]
-      }
-    ]
-  ]
-}
-```
 
 ## FAQ
 
