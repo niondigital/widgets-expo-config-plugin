@@ -1,4 +1,4 @@
-import { ConfigPlugin, withEntitlementsPlist } from '@expo/config-plugins';
+import { ConfigPlugin, withEntitlementsPlist } from 'expo/config-plugins';
 
 import { WidgetsPluginProps } from './types/types';
 

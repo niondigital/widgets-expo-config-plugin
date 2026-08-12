@@ -1,4 +1,4 @@
-import { ConfigPlugin, withXcodeProject } from '@expo/config-plugins';
+import { ConfigPlugin, withXcodeProject } from 'expo/config-plugins';
 import * as fs from 'fs';
 import * as path from 'path';
 import plist, { PlistObject } from 'plist';
@@ -121,9 +121,7 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 		);
 
 		// Paths for build settings (relative to platformProjectRoot = $(SRCROOT))
-		const entitlementsAbsolutePath = absoluteAllFiles.findLast((file) =>
-			file.endsWith('.entitlements')
-		) as string;
+		const entitlementsAbsolutePath = absoluteAllFiles.findLast((file) => file.endsWith('.entitlements')) as string;
 		const entitlementsPathForBuildSettings = path.relative(platformProjectRoot, entitlementsAbsolutePath);
 		const infoPlistPathForBuildSettings = path.relative(
 			platformProjectRoot,
