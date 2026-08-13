@@ -11,7 +11,7 @@ An Expo config plugin (`@niondigital/widgets-expo-config-plugin`) that adds iOS 
 - `npm run build` — Compile TypeScript from `src/` to `build/` (uses `expo-module build`)
 - `npm run clean` — Remove build artifacts
 - `npm test` — Run Jest tests (uses `expo-module test`; currently no project tests exist)
-- `npm run prepare` — Prepare for publishing (build + lint)
+- `npm run prepare` — Clean + build (runs automatically on install from git and via `prepublishOnly` before publishing)
 
 All scripts delegate to `expo-module-scripts` which provides the TypeScript, Jest, ESLint, and Prettier configurations.
 

@@ -1,6 +1,6 @@
 {
   "name": "@niondigital/widgets-expo-config-plugin",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "description": "Expo config plugin to add widgets",
   "main": "build/withWidgets.js",
   "types": "build/withWidgets.d.ts",
@@ -8,7 +8,7 @@
     "build": "expo-module build",
     "clean": "expo-module clean",
     "test": "expo-module test",
-    "prepare": "expo-module prepare",
+    "prepare": "expo-module clean && expo-module build",
     "prepublishOnly": "expo-module prepublishOnly",
     "expo-module": "expo-module"
   },

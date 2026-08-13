@@ -6,7 +6,7 @@
     // which is not where main and types point.
     "rootDir": "./src",
     // The preset narrows ambient types to jest; the plugin runs in Node and needs fs, path and console.
-    "types": ["jest", "node"]
+    "types": ["node"]
   },
   "include": ["./src"],
   "exclude": ["**/__mocks__/*", "**/__tests__/*"]
