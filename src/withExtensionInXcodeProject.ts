@@ -1,4 +1,4 @@
-import { ConfigPlugin, withXcodeProject } from '@expo/config-plugins';
+import { ConfigPlugin, withXcodeProject } from 'expo/config-plugins';
 import * as fs from 'fs';
 import * as path from 'path';
 import plist, { PlistObject } from 'plist';
@@ -98,10 +98,13 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 		const appGroup = `group.${config?.ios?.bundleIdentifier || ''}.${props.name}`;
 		const existingEntitlementsFile = absoluteAllFiles.find((file) => file.endsWith('.entitlements'));
 
+		let entitlementsAbsolutePath: string;
 		if (existingEntitlementsFile) {
 			ensureAppGroupInEntitlements(existingEntitlementsFile, appGroup);
+			entitlementsAbsolutePath = existingEntitlementsFile;
 		} else {
-			absoluteAllFiles.push(writeEntitlementsFile(platformProjectRoot, props));
+			entitlementsAbsolutePath = writeEntitlementsFile(platformProjectRoot, props);
+			absoluteAllFiles.push(entitlementsAbsolutePath);
 		}
 
 		// Convert all paths to relative (to extension directory) for PBXGroup file references
@@ -121,9 +124,6 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 		);
 
 		// Paths for build settings (relative to platformProjectRoot = $(SRCROOT))
-		const entitlementsAbsolutePath = absoluteAllFiles.findLast((file) =>
-			file.endsWith('.entitlements')
-		) as string;
 		const entitlementsPathForBuildSettings = path.relative(platformProjectRoot, entitlementsAbsolutePath);
 		const infoPlistPathForBuildSettings = path.relative(
 			platformProjectRoot,

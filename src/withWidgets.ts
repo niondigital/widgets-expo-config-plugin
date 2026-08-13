@@ -1,4 +1,4 @@
-import { ConfigPlugin } from '@expo/config-plugins';
+import { ConfigPlugin } from 'expo/config-plugins';
 
 import { WidgetsPluginProps } from './types/types';
 import { withEASExtraConfig } from './withEASExtraConfig';
