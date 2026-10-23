@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 An Expo config plugin (`@niondigital/widgets-expo-config-plugin`) that adds iOS widget extension targets to Expo/React Native projects. It modifies the Xcode project at prebuild time — there is no runtime JavaScript component.
 
+Supported Expo SDK range: 52 or newer (peer dependency `expo >=52`), tested against SDK 52 through 58. The `expo` devDependency pins the SDK the plugin is built and tested against; bump it together with `expo-module-scripts` when moving to a newer SDK.
+
 ## Commands
 
 - `npm run build` — Compile TypeScript from `src/` to `build/` (uses `expo-module build`)
