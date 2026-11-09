@@ -107,8 +107,10 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 			absoluteAllFiles.push(entitlementsAbsolutePath);
 		}
 
-		// Convert all paths to relative (to extension directory) for PBXGroup file references
-		const relativeFiles = absoluteAllFiles.map((file) => path.relative(absoluteExtensionPath, file));
+		// File references are relative to the ios folder (the main group), not to the extension directory: addPbxGroup
+		// and addBuildPhase reuse any existing reference with an equal path, so a bare "Info.plist" would be shared
+		// with another extension, and Xcode refuses a reference that is a member of more than one group.
+		const relativeFiles = absoluteAllFiles.map((file) => path.relative(platformProjectRoot, file));
 
 		// Filter files by type for different build phases
 		const sourceFiles = relativeFiles.filter((file) => file.endsWith('.swift'));
@@ -130,12 +132,9 @@ export const withExtensionInXcodeProject: ConfigPlugin<WidgetsPluginProps> = (co
 			path.join(absoluteExtensionPath, 'Info.plist')
 		);
 
-		// PBXGroup path relative to ios folder
-		const groupPath = path.join('..', extensionPath);
-
-		// Add the new PBXGroup to the top level group. This makes the
-		// files / folder appear in the file explorer in Xcode.
-		const extGroup = xcodeProject.addPbxGroup(relativeFiles, targetName, groupPath);
+		// The group has no path of its own because the file paths already carry the directory. The empty path has to
+		// be passed as '""': the xcode library writes an omitted path as the literal `undefined`.
+		const extGroup = xcodeProject.addPbxGroup(relativeFiles, targetName, '""');
 
 		// Add the new PBXGroup to the top level group
 		const groups: any[] = xcodeProject.hash.project.objects['PBXGroup'];
