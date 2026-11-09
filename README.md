@@ -6,6 +6,10 @@ This plugin is an [Expo Config Plugin](https://docs.expo.dev/guides/config-plugi
 
 > **Note:** Currently, this plugin only supports iOS widgets. Android widget support may be added in the future.
 
+## Compatibility
+
+The plugin requires Expo SDK 52 or newer (`expo >=52` peer dependency) and is tested against Expo SDK 52 through 58. It only modifies the Xcode project, the app's entitlements and the EAS build config at prebuild time, so it does not depend on the app's `AppDelegate`, `Info.plist` or runtime APIs that change between SDK versions.
+
 ---
 
 ## Installation
